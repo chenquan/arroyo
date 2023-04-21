@@ -323,6 +323,7 @@ impl ApiServer {
             .await
             .map_err(log_and_map)?;
 
+        // 创建一个 pipeline
         let pipeline_id = pipelines::create_pipeline(req, auth.clone(), &transaction).await?;
         let create_job = CreateJobReq {
             pipeline_id: format!("{}", pipeline_id),
@@ -330,6 +331,7 @@ impl ApiServer {
             preview,
         };
 
+        // 创建一个任务
         let job_id = jobs::create_job(create_job, auth, &transaction).await?;
 
         transaction.commit().await.map_err(log_and_map)?;

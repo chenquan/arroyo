@@ -81,6 +81,7 @@ impl ProgramCompiler {
         }
     }
 
+    /// compile_remote 发送到远程编译服务进行编译
     pub async fn compile_remote(&self, endpoint: String) -> Result<CompiledProgram> {
         let req = CompileQueryReq {
             job_id: self.job_id.clone(),
@@ -109,13 +110,14 @@ impl ProgramCompiler {
             })?;
 
         let resp = resp.into_inner();
-
+        // 返回编译成功的文件地址
         Ok(CompiledProgram {
             pipeline_path: resp.pipeline_path,
             wasm_path: resp.wasm_fns_path,
         })
     }
 
+    /// 本地编译
     pub async fn compile_local(&self) -> Result<CompiledProgram> {
         let bin_dir = PathBuf::from_str(OUTPUT_PATH)
             .unwrap()
@@ -226,6 +228,7 @@ wasm-opt = false
         );
         Self::create_subproject(&dir, "wasm-fns", &wasmfns_toml, "lib.rs", wasm).await?;
 
+        // 执行编译命令，编译pipeline
         let result = Command::new("cargo")
             .current_dir(&dir)
             .env("RUSTFLAGS", "-C target-cpu=native")
@@ -236,9 +239,10 @@ wasm-opt = false
 
         if !result.status.success() {
             return Err(fatal("Compilation failed for this query. We have been notified and are looking into the problem.",
-                  anyhow!("Compilation Failed: {}", String::from_utf8_lossy(&result.stderr))).into());
+                             anyhow!("Compilation Failed: {}", String::from_utf8_lossy(&result.stderr))).into());
         }
 
+        // 编译wasm
         let result = Command::new("wasm-pack")
             .arg("build")
             .current_dir(&dir.join("wasm-fns"))
@@ -346,15 +350,15 @@ wasm-opt = false
                             let micros = d.as_micros() as u64;
                             (
                                 quote! { Duration::from_micros(#micros) },
-                                quote!{ sources::ImpulseSpec::Delay(Duration::from_micros(#micros)) }
+                                quote! { sources::ImpulseSpec::Delay(Duration::from_micros(#micros)) }
                             )
                         }
                         arroyo_datastream::ImpulseSpec::EventsPerSecond(eps) => {
                             (
-                                quote!{ None },
-                                quote!{ sources::ImpulseSpec::EventsPerSecond(#eps) },
+                                quote! { None },
+                                quote! { sources::ImpulseSpec::EventsPerSecond(#eps) },
                             )
-                        },
+                        }
                     };
 
                     let limit = total_events.unwrap_or(usize::MAX);
@@ -406,15 +410,15 @@ wasm-opt = false
                     let out_t = parse_type(&output.unwrap().weight().value);
 
                     let agg = match agg {
-                        None => quote!{ WindowOperation::Aggregate(aggregators::vec_aggregator) },
-                        Some(arroyo_datastream::WindowAgg::Count) => quote!{ WindowOperation::Aggregate(aggregators::count_aggregator) },
-                        Some(arroyo_datastream::WindowAgg::Min) => quote!{ WindowOperation::Aggregate(aggregators::min_aggregator) },
-                        Some(arroyo_datastream::WindowAgg::Max) => quote!{ WindowOperation::Aggregate(aggregators::max_aggregator) },
-                        Some(arroyo_datastream::WindowAgg::Sum) => quote!{ WindowOperation::Aggregate(aggregators::sum_aggregator) },
+                        None => quote! { WindowOperation::Aggregate(aggregators::vec_aggregator) },
+                        Some(arroyo_datastream::WindowAgg::Count) => quote! { WindowOperation::Aggregate(aggregators::count_aggregator) },
+                        Some(arroyo_datastream::WindowAgg::Min) => quote! { WindowOperation::Aggregate(aggregators::min_aggregator) },
+                        Some(arroyo_datastream::WindowAgg::Max) => quote! { WindowOperation::Aggregate(aggregators::max_aggregator) },
+                        Some(arroyo_datastream::WindowAgg::Sum) => quote! { WindowOperation::Aggregate(aggregators::sum_aggregator) },
                         Some(arroyo_datastream::WindowAgg::Expression {
-                            expression,
-                            ..
-                        }) => {
+                                 expression,
+                                 ..
+                             }) => {
                             let expr: syn::Expr = parse_str(expression).unwrap();
                             let operation = if *flatten {
                                 format_ident!("Flatten")
@@ -427,7 +431,7 @@ wasm-opt = false
                                     #expr
                                 })
                             }
-                        },
+                        }
                     };
 
                     match typ {
@@ -559,7 +563,7 @@ wasm-opt = false
                         vec![#(#client_configs ),*]))
                     }
                 }
-                Operator::NexmarkSource{first_event_rate, num_events}  => {
+                Operator::NexmarkSource { first_event_rate, num_events } => {
                     match *num_events {
                         Some(events) => {
                             quote! {
@@ -572,7 +576,7 @@ wasm-opt = false
                             }
                         }
                     }
-                    }
+                }
                 Operator::Count => {
                     let in_k = parse_type(&input.unwrap().weight().key);
                     let in_t = parse_type(&input.unwrap().weight().value);
@@ -581,7 +585,7 @@ wasm-opt = false
                     quote! {
                         Box::new(CountOperator::<#in_k, #in_t>::new())
                     }
-                },
+                }
                 Operator::Aggregate(behavior) => {
                     let in_k = parse_type(&input.unwrap().weight().key);
                     let in_t = parse_type(&input.unwrap().weight().value);
@@ -596,16 +600,16 @@ wasm-opt = false
                     quote! {
                         Box::new(AggregateOperator::<#in_k, #in_t>::new(AggregateBehavior::#behavior))
                     }
-                },
+                }
                 Operator::FlattenOperator { name } => {
                     let k = parse_type(&output.unwrap().weight().key);
                     let t = parse_type(&output.unwrap().weight().value);
-                 quote! {
+                    quote! {
                     Box::new(FlattenOperator::<#k, #t>::new(#name.to_string()))
                 }
-            },
+                }
                 Operator::ExpressionOperator { name, expression, return_type } => {
-                    let expr : syn::Expr = parse_str(expression).expect(expression);
+                    let expr: syn::Expr = parse_str(expression).expect(expression);
                     let in_k = parse_type(&input.unwrap().weight().key);
                     let in_t = parse_type(&input.unwrap().weight().value);
                     let out_k = parse_type(&output.unwrap().weight().key);
@@ -619,15 +623,15 @@ wasm-opt = false
                                     predicate_fn: Box::new(#func),
                                 })
                             }
-                        },
+                        }
                         arroyo_datastream::ExpressionReturnType::Record => {
-                    quote! {
+                            quote! {
                         Box::new(MapOperator::<#in_k, #in_t, #out_k, #out_t> {
                             name: #name.to_string(),
                             map_fn: Box::new(#func),
                         })
                     }
-                        },
+                        }
                         arroyo_datastream::ExpressionReturnType::OptionalRecord => {
                             quote! {
                                 Box::new(OptionMapOperator::<#in_k, #in_t, #out_k, #out_t> {
@@ -635,11 +639,11 @@ wasm-opt = false
                                     map_fn: Box::new(#func),
                                 })
                             }
-                        },
+                        }
                     }
-                },
+                }
                 Operator::FlatMapOperator { name, expression, return_type } => {
-                    let expr : syn::Expr = parse_str(expression).expect(expression);
+                    let expr: syn::Expr = parse_str(expression).expect(expression);
                     let in_k = parse_type(&input.unwrap().weight().key);
                     let in_t = parse_type(&input.unwrap().weight().value);
                     let in_t = extract_container_type("Vec", &in_t).expect("Input to aggregate is not a Vec");
@@ -656,14 +660,14 @@ wasm-opt = false
                                     }
                                 }
                             }
-                        },
+                        }
                         arroyo_datastream::ExpressionReturnType::Record => {
                             quote! {
                                 |record, _| {
                                     Some(#expr)
                                 }
                             }
-                        },
+                        }
                         arroyo_datastream::ExpressionReturnType::OptionalRecord => {
                             quote! {
                                 |record, _| {
@@ -679,10 +683,11 @@ wasm-opt = false
                             map_fn: Box::new(#func),
                         })
                     }
-                },
-                Operator::SlidingWindowAggregator(SlidingWindowAggregator{
-                    width,slide,aggregator,bin_merger,
-                    in_memory_add,in_memory_remove,bin_type,mem_type}) => {
+                }
+                Operator::SlidingWindowAggregator(SlidingWindowAggregator {
+                                                      width, slide, aggregator, bin_merger,
+                                                      in_memory_add, in_memory_remove, bin_type, mem_type
+                                                  }) => {
                     let in_k = parse_type(&input.unwrap().weight().key);
                     let in_t = parse_type(&input.unwrap().weight().value);
                     let out_t = parse_type(&output.unwrap().weight().value);
@@ -695,7 +700,7 @@ wasm-opt = false
                     let in_memory_add: syn::ExprClosure = parse_str(in_memory_add).unwrap();
                     let in_memory_remove: syn::ExprClosure = parse_str(in_memory_remove).unwrap();
 
-                    quote!{
+                    quote! {
                         Box::new(arroyo_worker::operators::aggregating_window::AggregatingWindowFunc::<#in_k, #in_t, #bin_t, #mem_t, #out_t>::
                         new(std::time::Duration::from_millis(#width),
                         std::time::Duration::from_millis(#slide),
@@ -704,7 +709,7 @@ wasm-opt = false
                             #in_memory_add,
                             #in_memory_remove))
                     }
-                },
+                }
                 Operator::TumblingWindowAggregator(TumblingWindowAggregator { width, aggregator, bin_merger, bin_type }) => {
                     let in_k = parse_type(&input.unwrap().weight().key);
                     let in_t = parse_type(&input.unwrap().weight().value);
@@ -713,31 +718,31 @@ wasm-opt = false
                     let width = width.as_millis() as u64;
                     let aggregator: syn::ExprClosure = parse_str(aggregator).unwrap();
                     let bin_merger: syn::ExprClosure = parse_str(bin_merger).unwrap();
-                    quote!{
+                    quote! {
                         Box::new(arroyo_worker::operators::tumbling_aggregating_window::
                             TumblingAggregatingWindowFunc::<#in_k, #in_t, #bin_t, #out_t>::
                         new(std::time::Duration::from_millis(#width),
                             #aggregator,
                             #bin_merger))
                     }
-                },
+                }
                 Operator::TumblingTopN(
-                        TumblingTopN {
-                            width,
-                            max_elements,
-                            extractor,
-                            partition_key_type,
-                            converter,
-                        },
-                    ) => {
-                        let in_k = parse_type(&input.unwrap().weight().key);
-                        let in_t = parse_type(&input.unwrap().weight().value);
-                        let out_t = parse_type(&output.unwrap().weight().value);
-                        let pk_type = parse_type(partition_key_type);
-                        let width = width.as_millis() as u64;
-                        let extractor: syn::ExprClosure = parse_str(extractor).expect(extractor);
-                        let converter: syn::ExprClosure = parse_str(converter).unwrap();
-                        quote! {
+                    TumblingTopN {
+                        width,
+                        max_elements,
+                        extractor,
+                        partition_key_type,
+                        converter,
+                    },
+                ) => {
+                    let in_k = parse_type(&input.unwrap().weight().key);
+                    let in_t = parse_type(&input.unwrap().weight().value);
+                    let out_t = parse_type(&output.unwrap().weight().value);
+                    let pk_type = parse_type(partition_key_type);
+                    let width = width.as_millis() as u64;
+                    let extractor: syn::ExprClosure = parse_str(extractor).expect(extractor);
+                    let converter: syn::ExprClosure = parse_str(converter).unwrap();
+                    quote! {
                         Box::new(arroyo_worker::operators::tumbling_top_n_window::
                             TumblingTopNWindowFunc::<#in_k, #in_t, #pk_type, #out_t>::
                         new(std::time::Duration::from_millis(#width),
@@ -745,7 +750,7 @@ wasm-opt = false
                             #extractor,
                             #converter))
                     }
-                    }
+                }
 
                 Operator::SlidingAggregatingTopN(
                     SlidingAggregatingTopN {
@@ -928,7 +933,7 @@ wasm-opt = false
                     let cur_record = format_ident!("record_{}", i);
                     let next_record = format_ident!("record_{}", i + 1);
 
-                    let call = quote!{ #name(&#cur_record.key, &#cur_record.value) };
+                    let call = quote! { #name(&#cur_record.key, &#cur_record.value) };
 
                     fused_body.push(match udf.behavior {
                         WasmBehavior::Map => {

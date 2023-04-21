@@ -82,6 +82,7 @@ impl State for Created {
 
 #[derive(Debug)]
 pub struct Failed;
+
 #[async_trait::async_trait]
 impl State for Failed {
     fn name(&self) -> &'static str {
@@ -176,8 +177,11 @@ impl TransitionTo<Running> for Scheduling {
 }
 
 impl TransitionTo<CheckpointStopping> for Running {}
+
 impl TransitionTo<Stopping> for Running {}
+
 impl TransitionTo<Finishing> for Running {}
+
 impl TransitionTo<Recovering> for Running {
     fn update_status(&self) -> TransitionFn {
         Box::new(|ctx| {
@@ -185,6 +189,7 @@ impl TransitionTo<Recovering> for Running {
         })
     }
 }
+
 impl TransitionTo<Rescaling> for Running {}
 
 impl TransitionTo<Scheduling> for Rescaling {
@@ -194,6 +199,7 @@ impl TransitionTo<Scheduling> for Rescaling {
         })
     }
 }
+
 impl TransitionTo<Stopping> for Rescaling {}
 
 impl TransitionTo<Compiling> for Recovering {}
@@ -210,6 +216,7 @@ impl TransitionTo<Stopped> for Stopping {
 }
 
 impl TransitionTo<Stopping> for CheckpointStopping {}
+
 impl TransitionTo<Stopped> for CheckpointStopping {
     fn update_status(&self) -> TransitionFn {
         Box::new(done_transition)
@@ -281,8 +288,8 @@ pub struct StateHolder {
 
 impl Transition {
     pub fn next<ThisState: State, NextState: State>(t: ThisState, n: NextState) -> Transition
-    where
-        ThisState: TransitionTo<NextState>,
+        where
+            ThisState: TransitionTo<NextState>,
     {
         Transition::Advance(StateHolder {
             state: Box::new(n),
@@ -296,7 +303,7 @@ async fn execute_state<'a>(
     mut ctx: Context<'a>,
 ) -> (Option<Box<dyn State>>, Context<'a>) {
     let state_name = state.name();
-
+    // 推动状态机执行下一个状态
     let next: Option<Box<dyn State>> = match state.next(&mut ctx).await {
         Ok(Transition::Advance(s)) => {
             info!(
@@ -314,11 +321,11 @@ async fn execute_state<'a>(
         Ok(Transition::Stop) => None,
         Err(StateError::FatalError { message, source })
         | Err(StateError::RetryableError {
-            message,
-            source,
-            retries: 0,
-            ..
-        }) => {
+                  message,
+                  source,
+                  retries: 0,
+                  ..
+              }) => {
             error!(
                 message = "fatal state error",
                 job_id = ctx.config.id,
@@ -332,11 +339,11 @@ async fn execute_state<'a>(
             Some(s)
         }
         Err(StateError::RetryableError {
-            state,
-            message,
-            source,
-            retries,
-        }) => {
+                state,
+                message,
+                source,
+                retries,
+            }) => {
             error!(
                 message = "retryable state error",
                 job_id = ctx.config.id,
@@ -398,6 +405,8 @@ pub async fn run_to_completion(
     };
 
     loop {
+        // 推动状态机向前
+
         match execute_state(state, ctx).await {
             (Some(new_state), new_ctx) => {
                 state = new_state;
@@ -495,6 +504,7 @@ impl StateMachine {
                 *c = config;
             }
             if self.send(update).await.is_err() {
+                // 更新
                 self.start(status).await;
             }
         }

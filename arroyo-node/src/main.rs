@@ -110,7 +110,7 @@ impl NodeGrpc for NodeServer {
         }
         info!("Starting worker for job {}", req.job_id);
         let dir =
-            PathBuf::from_str(&format!("/tmp/arroyo-node-{}/{}", self.id.0, req.job_id,)).unwrap();
+            PathBuf::from_str(&format!("/tmp/arroyo-node-{}/{}", self.id.0, req.job_id, )).unwrap();
         tokio::fs::create_dir_all(&dir).await.unwrap();
 
         let bin = dir.join("pipeline");
@@ -250,6 +250,7 @@ impl NodeGrpc for NodeServer {
 
 #[tokio::main]
 pub async fn main() {
+    // 控制面服务的地址
     let controller_addr =
         std::env::var(CONTROLLER_ADDR_ENV).expect("CONTROLLER_ADDR env variable not set");
 

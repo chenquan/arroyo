@@ -35,6 +35,7 @@ impl State for Compiling {
             ctx.program.clone(),
         );
 
+        // 执行编译
         match pc.compile().await {
             Ok(res) => {
                 ctx.status.pipeline_path = Some(res.pipeline_path);

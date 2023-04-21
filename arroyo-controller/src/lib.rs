@@ -1,17 +1,12 @@
 #![allow(clippy::new_without_default)]
 // TODO: factor out complex types
 #![allow(clippy::type_complexity)]
+
 use crate::scheduler::{NomadScheduler, ProcessScheduler, Scheduler};
 
 use anyhow::bail;
 use arroyo_rpc::grpc::controller_grpc_server::{ControllerGrpc, ControllerGrpcServer};
-use arroyo_rpc::grpc::{
-    GrpcOutputSubscription, HeartbeatNodeReq, HeartbeatNodeResp, HeartbeatReq, HeartbeatResp,
-    OutputData, RegisterNodeReq, RegisterNodeResp, RegisterWorkerReq, RegisterWorkerResp,
-    TaskCheckpointCompletedReq, TaskCheckpointCompletedResp, TaskFailedReq, TaskFailedResp,
-    TaskFinishedReq, TaskFinishedResp, TaskStartedReq, TaskStartedResp, WorkerFinishedReq,
-    WorkerFinishedResp,
-};
+use arroyo_rpc::grpc::{GrpcOutputSubscription, HeartbeatNodeReq, HeartbeatNodeResp, HeartbeatReq, HeartbeatResp, OutputData, RegisterNodeReq, RegisterNodeResp, RegisterWorkerReq, RegisterWorkerResp, StopMode, TaskCheckpointCompletedReq, TaskCheckpointCompletedResp, TaskFailedReq, TaskFailedResp, TaskFinishedReq, TaskFinishedResp, TaskStartedReq, TaskStartedResp, WorkerFinishedReq, WorkerFinishedResp};
 use arroyo_rpc::grpc::{
     SinkDataReq, SinkDataResp, TaskCheckpointEventReq, TaskCheckpointEventResp,
 };
@@ -213,7 +208,7 @@ impl ControllerGrpc for ControllerServer {
                 job_hash: req.job_hash,
             },
         )
-        .await?;
+            .await?;
 
         Ok(Response::new(RegisterWorkerResp {}))
     }
@@ -231,7 +226,7 @@ impl ControllerGrpc for ControllerServer {
                 time: Instant::now(),
             }),
         )
-        .await?;
+            .await?;
 
         return Ok(Response::new(HeartbeatResp {}));
     }
@@ -251,7 +246,7 @@ impl ControllerGrpc for ControllerServer {
                 operator_subtask: req.operator_subtask,
             },
         )
-        .await?;
+            .await?;
 
         Ok(Response::new(TaskStartedResp {}))
     }
@@ -268,7 +263,7 @@ impl ControllerGrpc for ControllerServer {
             &job_id,
             JobMessage::RunningMessage(RunningMessage::TaskCheckpointEvent(req)),
         )
-        .await?;
+            .await?;
 
         Ok(Response::new(TaskCheckpointEventResp {}))
     }
@@ -286,7 +281,7 @@ impl ControllerGrpc for ControllerServer {
             &job_id,
             JobMessage::RunningMessage(RunningMessage::TaskCheckpointFinished(req)),
         )
-        .await?;
+            .await?;
 
         Ok(Response::new(TaskCheckpointCompletedResp {}))
     }
@@ -306,7 +301,7 @@ impl ControllerGrpc for ControllerServer {
                 subtask_index: req.operator_subtask as u32,
             }),
         )
-        .await?;
+            .await?;
 
         Ok(Response::new(TaskFinishedResp {}))
     }
@@ -326,7 +321,7 @@ impl ControllerGrpc for ControllerServer {
                 reason: req.error,
             }),
         )
-        .await?;
+            .await?;
 
         Ok(Response::new(TaskFailedResp {}))
     }
@@ -421,6 +416,7 @@ impl ControllerServer {
     pub async fn new() -> Self {
         let scheduler: Arc<dyn Scheduler> = match std::env::var("SCHEDULER").ok().as_deref() {
             Some("node") => {
+                // 工作节点调度
                 info!("Using node scheduler");
                 Arc::new(NodeScheduler::new())
             }
@@ -429,6 +425,7 @@ impl ControllerServer {
                 Arc::new(NomadScheduler::new())
             }
             _ => {
+                // 内部调度
                 info!("Using process scheduler");
                 Arc::new(ProcessScheduler::new())
             }
@@ -494,6 +491,7 @@ impl ControllerServer {
         let jobs = Arc::clone(&self.job_state);
         let scheduler = Arc::clone(&self.scheduler);
 
+        // 定时拉起pgsql中的任务
         tokio::spawn(async move {
             loop {
                 let client = db.get().await.unwrap();

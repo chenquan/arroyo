@@ -197,12 +197,14 @@ pub(crate) async fn create_pipeline<'a>(
             }
 
             pipeline_type = PipelineType::sql;
+            // 编译SQL
             (program, sources, sinks) = compile_sql(&sql, &auth, tx).await?;
             text = Some(sql.query);
             compute_parallelism = sql.parallelism == 0;
         }
     };
 
+    // 优化
     optimizations::optimize(&mut program.graph);
 
     if program.graph.node_count() > auth.org_metadata.max_operators as usize {
@@ -224,6 +226,7 @@ pub(crate) async fn create_pipeline<'a>(
     // TODO: this is very hacky
     let is_preview = req.name.starts_with("preview");
     if is_preview {
+        // 预览模式
         set_parallelism(&mut program, 1);
     } else if compute_parallelism {
         set_default_parallelism(&auth, &mut program).await?;
