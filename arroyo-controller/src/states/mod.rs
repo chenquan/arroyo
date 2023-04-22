@@ -76,6 +76,7 @@ impl State for Created {
     }
 
     async fn next(self: Box<Self>, _: &mut Context) -> Result<Transition, StateError> {
+        // 直接扭转到编译状态
         Ok(Transition::next(*self, Compiling))
     }
 }
@@ -503,8 +504,10 @@ impl StateMachine {
                 let mut c = self.config.write().unwrap();
                 *c = config;
             }
+
+            // 发送job状态消息
             if self.send(update).await.is_err() {
-                // 更新
+                // 如果发送失败说明job没有启动，因此需要启动任务
                 self.start(status).await;
             }
         }

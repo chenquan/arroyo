@@ -16,6 +16,7 @@ impl State for Compiling {
 
     async fn next(self: Box<Self>, ctx: &mut Context) -> Result<Transition, StateError> {
         if ctx.status.pipeline_path.is_some() {
+            // 如果pipeline_path已存在，说明job已经被编译，直接进入下一阶段，开始调度job
             info!(
                 message = "Pipeline already compiled",
                 job_id = ctx.config.id,
@@ -23,6 +24,7 @@ impl State for Compiling {
             return Ok(Transition::next(*self, Scheduling {}));
         }
 
+        // 开始编译job
         info!(
             message = "Compiling pipeline",
             job_id = ctx.config.id,
