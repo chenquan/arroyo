@@ -74,6 +74,7 @@ impl ProgramCompiler {
     pub async fn compile(&self) -> Result<CompiledProgram> {
         if let Ok(endpoint) = std::env::var(REMOTE_COMPILER_ENDPOINT_ENV) {
             info!("Compiling remotely on {}", endpoint);
+            // 使用远程服务阶段编译
             self.compile_remote(endpoint).await
         } else {
             info!("Compiling locally");
@@ -310,6 +311,7 @@ wasm-opt = false
         }
     }
 
+    /// compile_pipeline_main 生成pipeline源代码
     fn compile_pipeline_main(&self, name: &str, hash: &str) -> TokenStream {
         let imports = quote! {
             use petgraph::graph::DiGraph;

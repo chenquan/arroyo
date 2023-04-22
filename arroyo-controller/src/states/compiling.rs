@@ -42,6 +42,7 @@ impl State for Compiling {
             Ok(res) => {
                 ctx.status.pipeline_path = Some(res.pipeline_path);
                 ctx.status.wasm_path = Some(res.wasm_path);
+                // 编译完成，进入下一个阶段：调度job
                 Ok(Transition::next(*self, Scheduling {}))
             }
             Err(e) => Err(e
