@@ -74,9 +74,10 @@ impl ProgramCompiler {
     pub async fn compile(&self) -> Result<CompiledProgram> {
         if let Ok(endpoint) = std::env::var(REMOTE_COMPILER_ENDPOINT_ENV) {
             info!("Compiling remotely on {}", endpoint);
-            // 使用远程服务阶段编译
+            // 使用远程服务编译
             self.compile_remote(endpoint).await
         } else {
+            // 本地编译
             info!("Compiling locally");
             self.compile_local().await
         }
@@ -1056,6 +1057,7 @@ wasm-opt = false
 mod tests {
     use quote::quote;
     use syn::parse_str;
+    use crate::compiler::{CompiledProgram, ProgramCompiler};
 
     use super::extract_container_type;
 
@@ -1071,5 +1073,14 @@ mod tests {
             None,
             extract_container_type("Vec", &parse_str("HashMap<String, u8>").unwrap())
         );
+    }
+    #[test]
+    fn compile(){
+        ProgramCompiler{
+            name: "".to_string(),
+            job_id: "".to_string(),
+            program: Program {},
+        }
+
     }
 }

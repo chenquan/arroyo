@@ -50,7 +50,9 @@ pub trait Scheduler: Send + Sync {
     async fn register_node(&self, req: RegisterNodeReq);
     async fn heartbeat_node(&self, req: HeartbeatNodeReq) -> Result<(), Status>;
     async fn worker_finished(&self, req: WorkerFinishedReq);
+    /// stop_worker 停止worker
     async fn stop_worker(&self, req: StopWorkerReq) -> anyhow::Result<()>;
+    /// workers_for_job 返回当前任务所有worker id
     async fn workers_for_job(&self, job_id: &str) -> anyhow::Result<Vec<WorkerId>>;
 
     async fn clean_cluster(&self, job_id: &str) -> anyhow::Result<()> {
@@ -60,7 +62,7 @@ pub trait Scheduler: Send + Sync {
                 worker_id: worker.0,
                 force: true,
             })
-            .await?;
+                .await?;
         }
 
         Ok(())
@@ -124,7 +126,7 @@ impl Scheduler for ProcessScheduler {
             "/tmp/arroyo-process/{}",
             start_pipeline_req.job_id
         ))
-        .unwrap();
+            .unwrap();
         tokio::fs::create_dir_all(&base_path).await.unwrap();
 
         let pipeline_path = base_path.join("pipeline");
@@ -149,7 +151,7 @@ impl Scheduler for ProcessScheduler {
                 (start_pipeline_req.slots as usize - slots_scheduled).min(SLOTS_PER_NODE);
 
             let worker_id = self.worker_counter.fetch_add(1, Ordering::SeqCst);
-
+            // 用于停止worker
             let (tx, rx) = oneshot::channel();
 
             {
@@ -168,7 +170,9 @@ impl Scheduler for ProcessScheduler {
             println!("Starting in path {:?}", path);
             let workers = self.workers.clone();
             let env_map = start_pipeline_req.env_vars.clone();
+
             tokio::spawn(async move {
+                // 执行pipeline程序
                 let mut command = Command::new("./pipeline");
                 for (env, value) in env_map {
                     command.env(env, value);
@@ -191,10 +195,12 @@ impl Scheduler for ProcessScheduler {
                     }
                     _ = rx => {
                         info!(message = "Killing child", worker_id = worker_id, job_id = job_id);
+                        // 主动kill
                         child.kill().await.unwrap();
                     }
                 }
 
+                // 退出时移除worker
                 let mut state = workers.lock().await;
                 state.remove(&WorkerId(worker_id));
             });
@@ -221,14 +227,17 @@ impl Scheduler for ProcessScheduler {
     }
 
     async fn stop_worker(&self, req: StopWorkerReq) -> anyhow::Result<()> {
+        // 停止工作ID对应的工作
         let worker = {
             let mut state = self.workers.lock().await;
             let Some(worker) = state.remove(&WorkerId(req.worker_id)) else {
+                // 如果工作ID对应的工作不存在则直接返回
                 return Ok(());
             };
             worker
         };
 
+        // 发送关闭的信号
         let _ = worker.shutdown_tx.send(());
 
         Ok(())
@@ -274,8 +283,8 @@ impl NodeStatus {
     fn release_slots(&mut self, worker_id: WorkerId, slots: usize) {
         if let Some(freed) = self.scheduled_slots.remove(&worker_id) {
             assert_eq!(freed, slots,
-                "Controller and node disagree about how many slots are scheduled for worker {:?} ({} != {})",
-                worker_id, freed, slots);
+                       "Controller and node disagree about how many slots are scheduled for worker {:?} ({} != {})",
+                       worker_id, freed, slots);
 
             self.free_slots += slots;
 
