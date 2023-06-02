@@ -367,6 +367,7 @@ impl Optimizer for FlatMapFusionOptimizer {
         if chain.len() != 2 {
             return None;
         }
+
         let flatten = &chain[0].0;
         let expression = &chain[1].0;
         match (&flatten.operator, &expression.operator) {

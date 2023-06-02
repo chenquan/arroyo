@@ -147,16 +147,16 @@ impl CheckpointState {
             .push(api::TaskCheckpointEvent {
                 time: c.time,
                 event_type: match c.event_type() {
-                    grpc::TaskCheckpointEventType::StartedAlignment => {
+                    TaskCheckpointEventType::StartedAlignment => {
                         api::TaskCheckpointEventType::AlignmentStarted
                     }
-                    grpc::TaskCheckpointEventType::StartedCheckpointing => {
+                    TaskCheckpointEventType::StartedCheckpointing => {
                         api::TaskCheckpointEventType::CheckpointStarted
                     }
-                    grpc::TaskCheckpointEventType::FinishedOperatorSetup => {
+                    TaskCheckpointEventType::FinishedOperatorSetup => {
                         api::TaskCheckpointEventType::CheckpointOperatorFinished
                     }
-                    grpc::TaskCheckpointEventType::FinishedSync => {
+                    TaskCheckpointEventType::FinishedSync => {
                         api::TaskCheckpointEventType::CheckpointSyncFinished
                     }
                 } as i32,
@@ -307,6 +307,7 @@ impl CheckpointState {
         let Some(internal_data) = &backend_data.backend_data else {
             return None
         };
+
         match &internal_data {
             backend_data::BackendData::ParquetStore(data) => {
                 Some(((data.epoch, data.file.clone()), backend_data))

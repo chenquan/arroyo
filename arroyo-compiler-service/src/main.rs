@@ -180,22 +180,22 @@ impl CompileService {
                 .args(&args)
                 .output()
                 .await
-        } else {
-            Command::new("cargo")
-                .current_dir(&self.build_dir)
-                .arg("build")
-                .arg("--release")
-                .output()
-                .await
         }
+
+        Command::new("cargo")
+            .current_dir(&self.build_dir)
+            .arg("build")
+            .arg("--release")
+            .output()
+            .await
     }
 
     fn pipeline_path(&self) -> &str {
         if self.debug {
             "target/debug/pipeline"
-        } else {
-            "target/release/pipeline"
         }
+
+        "target/release/pipeline"
     }
 
     async fn compile(&self, req: CompileQueryReq) -> io::Result<CompileQueryResp> {

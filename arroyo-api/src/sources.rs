@@ -882,14 +882,14 @@ pub(crate) async fn delete_source(
         .await
         .map_err(|e| handle_delete("source", "pipelines", e))?;
 
-    if deleted == 0 {
-        return Err(Status::not_found(format!(
-            "No source with name {}",
-            req.name
-        )));
+    if deleted != 0 {
+        Ok(())
     }
 
-    Ok(())
+    Err(Status::not_found(format!(
+        "No source with name {}",
+        req.name
+    )))
 }
 
 pub(crate) async fn get_confluent_schema(

@@ -117,6 +117,7 @@ impl RunningJobModel {
                     )
                 }
             }
+
             RunningMessage::TaskCheckpointFinished(c) => {
                 if let Some(checkpoint_state) = &mut self.checkpoint_state {
                     if c.epoch != self.epoch {
@@ -282,9 +283,9 @@ impl RunningJobModel {
     pub fn compaction_needed(&self) -> Option<u32> {
         if self.epoch - self.min_epoch > CHECKPOINTS_TO_KEEP && self.epoch % COMPACT_EVERY == 0 {
             Some(self.epoch - CHECKPOINTS_TO_KEEP)
-        } else {
-            None
         }
+
+        None
     }
 
     pub fn failed(&self) -> bool {

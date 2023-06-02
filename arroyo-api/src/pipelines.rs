@@ -342,13 +342,12 @@ pub(crate) async fn get_pipeline(
     db: &impl GenericClient,
 ) -> Result<PipelineDef, Status> {
     if let Ok(id) = i64::from_str(id) {
-        let res = api_queries::get_pipeline()
+        if let Some(res) = api_queries::get_pipeline()
             .bind(db, &id, &auth.organization_id)
             .opt()
             .await
-            .map_err(log_and_map)?;
-
-        if let Some(res) = res {
+            .map_err(log_and_map)?
+        {
             return res.try_into();
         }
     }

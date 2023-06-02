@@ -50,6 +50,17 @@ fn yaml_config<T: DeserializeOwned>(var: &str, default: T) -> T {
 
 impl KubernetesScheduler {
     pub async fn from_env() -> Self {
+        let requests = Some(
+            [
+                ("cpu".to_string(), serde_json::from_str("\"400m\"").unwrap()),
+                (
+                    "mem".to_string(),
+                    serde_json::from_str("\"200Mi\"").unwrap(),
+                ),
+            ]
+            .into(),
+        );
+
         Self {
             client: Client::try_default().await.unwrap(),
             namespace: string_config(K8S_NAMESPACE_ENV, "default"),
@@ -66,16 +77,7 @@ impl KubernetesScheduler {
                 ResourceRequirements {
                     claims: None,
                     limits: None,
-                    requests: Some(
-                        [
-                            ("cpu".to_string(), serde_json::from_str("\"400m\"").unwrap()),
-                            (
-                                "mem".to_string(),
-                                serde_json::from_str("\"200Mi\"").unwrap(),
-                            ),
-                        ]
-                        .into(),
-                    ),
+                    requests,
                 },
             ),
             slots_per_pod: u32_config(K8S_WORKER_SLOTS_ENV, 4),
@@ -145,7 +147,7 @@ impl Scheduler for KubernetesScheduler {
             },
         ]);
 
-        if let Ok(addr) = std::env::var(CONTROLLER_ADDR_ENV) {
+        if let Ok(addr) = env::var(CONTROLLER_ADDR_ENV) {
             env.as_array_mut().unwrap().push(json!({
                 "name": CONTROLLER_ADDR_ENV,
                 "value": addr,

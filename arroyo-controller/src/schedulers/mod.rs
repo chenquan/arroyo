@@ -273,12 +273,13 @@ impl NodeStatus {
             FREE_SLOTS.sub(slots as f64);
             self.free_slots = v;
             self.scheduled_slots.insert(worker, slots);
-        } else {
-            panic!(
-                "Attempted to schedule more slots than are available on node {} ({} < {})",
-                self.addr, self.free_slots, slots
-            );
+            return;
         }
+
+        panic!(
+            "Attempted to schedule more slots than are available on node {} ({} < {})",
+            self.addr, self.free_slots, slots
+        );
     }
 
     fn release_slots(&mut self, worker_id: WorkerId, slots: usize) {
@@ -290,12 +291,13 @@ impl NodeStatus {
             self.free_slots += slots;
 
             FREE_SLOTS.add(slots as f64);
-        } else {
-            warn!(
-                "Received release request for unknown worker {:?}",
-                worker_id
-            );
+            return;
         }
+
+        warn!(
+            "Received release request for unknown worker {:?}",
+            worker_id
+        );
     }
 }
 
@@ -375,18 +377,16 @@ impl NodeScheduler {
 
         let mut client = NodeGrpcClient::connect(format!("http://{}", node.addr)).await?;
 
-        match (
-            client
-                .stop_worker(Request::new(StopWorkerReq {
-                    job_id: job_id.to_string(),
-                    worker_id: worker_id.0,
-                    force,
-                }))
-                .await?
-                .get_ref()
-                .status(),
-            force,
-        ) {
+        let status = client
+            .stop_worker(Request::new(StopWorkerReq {
+                job_id: job_id.to_string(),
+                worker_id: worker_id.0,
+                force,
+            }))
+            .await?
+            .get_ref()
+            .status();
+        match (status, force) {
             (StopWorkerStatus::NotFound, false) => {
                 bail!("couldn't find worker, will only continue if force")
             }
@@ -415,16 +415,16 @@ impl Scheduler for NodeScheduler {
         if let Some(node) = state.nodes.get_mut(&NodeId(req.node_id)) {
             node.last_heartbeat = Instant::now();
             Ok(())
-        } else {
-            warn!(
-                "Received heartbeat for unregistered node {}, failing request",
-                req.node_id
-            );
-            Err(Status::not_found(format!(
-                "node {} not in scheduler's collection of nodes",
-                req.node_id
-            )))
         }
+
+        warn!(
+            "Received heartbeat for unregistered node {}, failing request",
+            req.node_id
+        );
+        Err(Status::not_found(format!(
+            "node {} not in scheduler's collection of nodes",
+            req.node_id
+        )))
     }
 
     async fn worker_finished(&self, req: WorkerFinishedReq) {
@@ -440,12 +440,14 @@ impl Scheduler for NodeScheduler {
             );
         }
 
-        if state.workers.remove(&worker_id).is_none() {
-            warn!(
-                "Got worker finished message for unknown worker {}",
-                worker_id.0
-            );
+        if state.workers.remove(&worker_id).is_some() {
+            return;
         }
+
+        warn!(
+            "Got worker finished message for unknown worker {}",
+            worker_id.0
+        );
     }
 
     async fn workers_for_job(
